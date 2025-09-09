@@ -6,6 +6,23 @@
     <script type="module" src="popup.js"></script>
 </head>
 <body>
-    <strong>Hello World!</strong>
+    <div id="app">
+        <h3>Weeek настройки</h3>
+        <label for="apiKey">API ключ</label>
+        <input id="apiKey" type="password" placeholder="Введите API ключ" autocomplete="off" />
+        <button id="saveKeyBtn">Сохранить ключ</button>
+
+        <div id="projectsBlock" hidden>
+            <label for="workspaceSelect">Рабочее пространство</label>
+            <select id="workspaceSelect"></select>
+
+            <label for="projectSelect">Проект</label>
+            <select id="projectSelect"></select>
+
+            <button id="saveProjectBtn">Сохранить проект</button>
+        </div>
+
+        <div id="status" role="status"></div>
+    </div>
 </body>
 </html>
