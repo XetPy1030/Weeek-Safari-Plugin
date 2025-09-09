@@ -1,11 +1,29 @@
 async function getSettings() {
-    const { weeekApiKey, weeekWorkspaceId } = await browser.storage.local.get(['weeekApiKey', 'weeekWorkspaceId']);
-    return { apiKey: weeekApiKey, workspaceId: weeekWorkspaceId };
+    const { weeekWorkspaceId } = await browser.storage.local.get(['weeekWorkspaceId']);
+    return { workspaceId: weeekWorkspaceId };
+}
+
+async function weeekLogin({ email, password }) {
+    const loginUrl = 'https://api.weeek.net/auth/login';
+    const resp = await fetch(loginUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, password, remember: true }),
+    });
+    if (!resp.ok) {
+        const t = await resp.text().catch(() => '');
+        throw new Error(`Login failed: ${resp.status} ${t}`);
+    }
+    return resp.json().catch(() => ({}));
 }
 
 async function postWeeekComment({ taskKey, mrUrl, mrTitle }) {
-    const { apiKey, workspaceId } = await getSettings();
-    if (!apiKey || !workspaceId) throw new Error('No API key or workspace');
+    const { workspaceId } = await getSettings();
+    if (!workspaceId) throw new Error('No workspace');
 
     // Формируем контент в формате Weeek (ProseMirror doc)
     const text = `MR: ${mrTitle}\n${mrUrl}`;
@@ -25,27 +43,27 @@ async function postWeeekComment({ taskKey, mrUrl, mrTitle }) {
 
     const url = `https://api.weeek.net/ws/${workspaceId}/tm/tasks/${encodeURIComponent(taskKey)}/comments`;
 
-    // return { taskKey, mrUrl, mrTitle, url, body };
-    // console.log('Posting comment to Weeek', { taskKey, mrUrl, mrTitle, url, body });
-
-    async function callRequest(endpoint) {
+    async function callWithCookie(endpoint) {
         const resp = await fetch(endpoint, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             },
+            credentials: "include",
             body: JSON.stringify(body),
         });
         if (!resp.ok) {
-            const body = await resp.text().catch(() => '');
-            throw new Error(`HTTP ${resp.status}: ${body}`);
+            const text = await resp.text().catch(() => '');
+            return { ok: false, status: resp.status, text };
         }
-        return resp.json().catch(() => ({}));
+        const data = await resp.json().catch(() => ({}));
+        return { ok: true, data };
     }
 
-    return await callRequest(url);
+    const cookieRes = await callWithCookie(url);
+    if (cookieRes.ok) return cookieRes.data;
+    throw new Error(`HTTP ${cookieRes.status}: ${cookieRes.text}`);
 }
 
 browser.runtime.onMessage.addListener((request, sender) => {
@@ -53,6 +71,11 @@ browser.runtime.onMessage.addListener((request, sender) => {
         return postWeeekComment(request.payload)
             .then(() => ({ ok: true }))
             // .then((res) => ({ ok: true, res }))
+            .catch((err) => ({ ok: false, error: String(err && err.message || err) }));
+    }
+    if (request && request.type === 'weeek.login') {
+        return weeekLogin(request.payload)
+            .then(() => ({ ok: true }))
             .catch((err) => ({ ok: false, error: String(err && err.message || err) }));
     }
 });

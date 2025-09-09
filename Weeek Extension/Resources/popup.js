@@ -1,11 +1,15 @@
 const dom = {
     apiKey: /** @type {HTMLInputElement} */ (document.getElementById('apiKey')),
     saveKeyBtn: /** @type {HTMLButtonElement} */ (document.getElementById('saveKeyBtn')),
+    email: /** @type {HTMLInputElement} */ (document.getElementById('email')),
+    password: /** @type {HTMLInputElement} */ (document.getElementById('password')),
+    loginBtn: /** @type {HTMLButtonElement} */ (document.getElementById('loginBtn')),
     projectsBlock: /** @type {HTMLDivElement} */ (document.getElementById('projectsBlock')),
     workspaceSelect: /** @type {HTMLSelectElement} */ (document.getElementById('workspaceSelect')),
     projectSelect: /** @type {HTMLSelectElement} */ (document.getElementById('projectSelect')),
     saveProjectBtn: /** @type {HTMLButtonElement} */ (document.getElementById('saveProjectBtn')),
     status: /** @type {HTMLDivElement} */ (document.getElementById('status')),
+    authState: /** @type {HTMLDivElement} */ (document.getElementById('authState')),
 };
 
 /**
@@ -19,7 +23,7 @@ function setStatus(text, kind = 'info') {
 }
 
 function loadFromStorage() {
-    return browser.storage.local.get(['weeekApiKey', 'weeekWorkspaceId', 'weeekProjectId']);
+    return browser.storage.local.get(['weeekApiKey', 'weeekWorkspaceId', 'weeekProjectId', 'weeekAuthEmail']);
 }
 
 function saveToStorage(data) {
@@ -62,8 +66,9 @@ function fillSelect(select, items, getValue, getLabel, selectedValue) {
 }
 
 async function init() {
-    const { weeekApiKey, weeekWorkspaceId, weeekProjectId } = await loadFromStorage();
+    const { weeekApiKey, weeekWorkspaceId, weeekProjectId, weeekAuthEmail } = await loadFromStorage();
     if (weeekApiKey) dom.apiKey.value = weeekApiKey;
+    if (weeekAuthEmail) dom.email.value = weeekAuthEmail;
 
     dom.saveKeyBtn.addEventListener('click', async () => {
         const apiKey = dom.apiKey.value.trim();
@@ -99,6 +104,35 @@ async function init() {
         const projectId = dom.projectSelect.value;
         await saveToStorage({ weeekApiKey: apiKey, weeekWorkspaceId: workspaceId, weeekProjectId: projectId });
         setStatus('Проект сохранён.', 'ok');
+    });
+
+    dom.loginBtn.addEventListener('click', async () => {
+        const email = dom.email.value.trim();
+        const password = dom.password.value;
+        if (!email || !password) {
+            dom.authState.textContent = 'Введите email и пароль';
+            dom.authState.style.color = '#dc2626';
+            return;
+        }
+        dom.authState.textContent = 'Выполняю вход…';
+        dom.authState.style.color = '#6b7280';
+        try {
+            const res = await browser.runtime.sendMessage({
+                type: 'weeek.login',
+                payload: { email, password },
+            });
+            if (res && res.ok) {
+                await saveToStorage({ weeekAuthEmail: email });
+                dom.authState.textContent = 'Вошли по сессии (cookie)';
+                dom.authState.style.color = '#16a34a';
+            } else {
+                dom.authState.textContent = 'Ошибка входа';
+                dom.authState.style.color = '#dc2626';
+            }
+        } catch (e) {
+            dom.authState.textContent = 'Ошибка входа';
+            dom.authState.style.color = '#dc2626';
+        }
     });
 
     if (weeekApiKey) {

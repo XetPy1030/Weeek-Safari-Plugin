@@ -12,6 +12,14 @@
         <input id="apiKey" type="password" placeholder="Введите API ключ" autocomplete="off" />
         <button id="saveKeyBtn">Сохранить ключ</button>
 
+        <hr />
+        <label for="email">Email (альтерн. вход)</label>
+        <input id="email" type="email" placeholder="mail@example.com" autocomplete="email" />
+        <label for="password">Пароль</label>
+        <input id="password" type="password" placeholder="Пароль" autocomplete="current-password" />
+        <button id="loginBtn">Войти по логину/паролю</button>
+        <div id="authState" aria-live="polite"></div>
+
         <div id="projectsBlock" hidden>
             <label for="workspaceSelect">Рабочее пространство</label>
             <select id="workspaceSelect"></select>
