@@ -22,7 +22,7 @@
     "content_scripts": [{
         "js": [ "content.js" ],
         "matches": [
-            "https://thesisgit.gitlab.yandexcloud.net/bilet/bvb_api/-/merge_requests/*"
+            "https://gitlab.com/*/*/-/merge_requests/*"
         ]
     }],
 
@@ -38,7 +38,7 @@
         "webRequestBlocking"
     ],
     "host_permissions": [
-        "https://thesisgit.gitlab.yandexcloud.net/*",
+        "https://gitlab.com/*",
         "https://api.weeek.net/*",
         "https://app.weeek.net/*"
     ]
