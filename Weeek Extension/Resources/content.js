@@ -44,47 +44,58 @@ function injectLinkIfNeeded(titleEl, url) {
 
 function injectActionButton(titleEl, taskKey) {
     if (!titleEl || !taskKey) return;
-    if (titleEl.querySelector('button[data-weeek-action="post-comment"]')) return;
-    const btn = document.createElement('button');
-    btn.textContent = 'Отправить в Weeek';
-    btn.type = 'button';
-    btn.setAttribute('data-weeek-action', 'post-comment');
-    btn.style.marginLeft = '8px';
-    btn.style.padding = '2px 8px';
-    btn.style.fontSize = '12px';
-    btn.style.borderRadius = '6px';
-    btn.style.border = '1px solid #d0d0d0';
-    btn.style.background = 'transparent';
-    btn.style.cursor = 'pointer';
-    btn.addEventListener('click', async () => {
-        btn.disabled = true;
+    if (titleEl.querySelector('[data-weeek-action]')) return;
+
+    function makeBtn(label) {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.type = 'button';
+        b.style.marginLeft = '8px';
+        b.style.padding = '2px 8px';
+        b.style.fontSize = '12px';
+        b.style.borderRadius = '6px';
+        b.style.border = '1px solid #d0d0d0';
+        b.style.background = 'transparent';
+        b.style.cursor = 'pointer';
+        return b;
+    }
+
+    const btnLink = makeBtn('В Weeek (ссылка)');
+    btnLink.setAttribute('data-weeek-action', 'post-comment-link');
+    btnLink.addEventListener('click', async () => {
+        btnLink.disabled = true;
         const href = location.href;
         const titleText = titleEl.textContent || '';
         try {
             const res = await browser.runtime.sendMessage({
                 type: 'weeek.postComment',
-                payload: {
-                    taskKey,
-                    mrUrl: href,
-                    mrTitle: titleText.trim(),
-                },
+                payload: { taskKey, mrUrl: href, mrTitle: titleText.trim() },
             });
-            // console.log('Posted comment to Weeek', res);
-            if (res && res.ok) {
-                btn.textContent = 'Отправлено';
-            } else {
-                btn.textContent = 'Ошибка';
-                btn.disabled = false;
-            }
-        } catch (e) {
-            btn.textContent = 'Ошибка';
-            btn.disabled = false;
-        }
+            if (res && res.ok) btnLink.textContent = 'Отправлено';
+            else { btnLink.textContent = 'Ошибка'; btnLink.disabled = false; }
+        } catch { btnLink.textContent = 'Ошибка'; btnLink.disabled = false; }
     });
+
+    const btnMention = makeBtn('В Weeek (упомянуть)');
+    btnMention.setAttribute('data-weeek-action', 'post-comment-mention');
+    btnMention.addEventListener('click', async () => {
+        btnMention.disabled = true;
+        const href = location.href;
+        try {
+            const res = await browser.runtime.sendMessage({
+                type: 'weeek.postCommentMention',
+                payload: { taskKey, mrUrl: href },
+            });
+            if (res && res.ok) btnMention.textContent = 'Отправлено';
+            else { btnMention.textContent = 'Ошибка'; btnMention.disabled = false; }
+        } catch { btnMention.textContent = 'Ошибка'; btnMention.disabled = false; }
+    });
+
     const sep = document.createElement('span');
     sep.textContent = ' ';
     titleEl.appendChild(sep);
-    titleEl.appendChild(btn);
+    titleEl.appendChild(btnLink);
+    titleEl.appendChild(btnMention);
 }
 
 async function tryInject() {

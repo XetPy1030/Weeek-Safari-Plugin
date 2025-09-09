@@ -10,6 +10,9 @@ const dom = {
     saveProjectBtn: /** @type {HTMLButtonElement} */ (document.getElementById('saveProjectBtn')),
     status: /** @type {HTMLDivElement} */ (document.getElementById('status')),
     authState: /** @type {HTMLDivElement} */ (document.getElementById('authState')),
+    mentionSelect: /** @type {HTMLSelectElement} */ (document.getElementById('mentionSelect')),
+    mentionStatus: /** @type {HTMLDivElement} */ (document.getElementById('mentionStatus')),
+    mentionSearch: /** @type {HTMLInputElement} */ (document.getElementById('mentionSearch')),
 };
 
 /**
@@ -23,7 +26,7 @@ function setStatus(text, kind = 'info') {
 }
 
 function loadFromStorage() {
-    return browser.storage.local.get(['weeekApiKey', 'weeekWorkspaceId', 'weeekProjectId', 'weeekAuthEmail']);
+    return browser.storage.local.get(['weeekApiKey', 'weeekWorkspaceId', 'weeekProjectId', 'weeekAuthEmail', 'weeekMentionUserId']);
 }
 
 function saveToStorage(data) {
@@ -65,8 +68,26 @@ function fillSelect(select, items, getValue, getLabel, selectedValue) {
     }
 }
 
+function fillMentionSelect(items, selectedValue) {
+    dom.mentionSelect.innerHTML = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = '— Не упоминать —';
+    dom.mentionSelect.appendChild(empty);
+    for (const m of items) {
+        const opt = document.createElement('option');
+        opt.value = String(m.id);
+        opt.textContent = String(m.name || m.firstName || m.email || m.id);
+        dom.mentionSelect.appendChild(opt);
+    }
+    // Выставляем выбранное значение, если оно присутствует, иначе оставляем пустой вариант
+    const toSelect = selectedValue != null ? String(selectedValue) : '';
+    const found = Array.from(dom.mentionSelect.options).some(o => o.value === toSelect);
+    dom.mentionSelect.value = found ? toSelect : '';
+}
+
 async function init() {
-    const { weeekApiKey, weeekWorkspaceId, weeekProjectId, weeekAuthEmail } = await loadFromStorage();
+    const { weeekApiKey, weeekWorkspaceId, weeekProjectId, weeekAuthEmail, weeekMentionUserId } = await loadFromStorage();
     if (weeekApiKey) dom.apiKey.value = weeekApiKey;
     if (weeekAuthEmail) dom.email.value = weeekAuthEmail;
 
@@ -125,6 +146,19 @@ async function init() {
                 await saveToStorage({ weeekAuthEmail: email });
                 dom.authState.textContent = 'Вошли по сессии (cookie)';
                 dom.authState.style.color = '#16a34a';
+                // Подтянем список участников воркспейса для выбора упоминания
+                try {
+                    const resp = await browser.runtime.sendMessage({ type: 'weeek.members' });
+                    const members = resp && resp.ok ? resp.data : [];
+                    if (Array.isArray(members)) {
+                        fillMentionSelect(members, weeekMentionUserId);
+                        dom.mentionStatus.textContent = '';
+                    } else {
+                        dom.mentionStatus.textContent = 'Не удалось загрузить участников';
+                    }
+                } catch {
+                    dom.mentionStatus.textContent = 'Не удалось загрузить участников';
+                }
             } else {
                 dom.authState.textContent = 'Ошибка входа';
                 dom.authState.style.color = '#dc2626';
@@ -148,6 +182,38 @@ async function init() {
             // молча, пользователь может нажать сохранить позже
         }
     }
+
+    // При открытии попробуем загрузить участников, если выбран workspace
+    if (dom.workspaceSelect.value) {
+        try {
+            const resp = await browser.runtime.sendMessage({ type: 'weeek.members' });
+            const members = resp && resp.ok ? resp.data : [];
+            if (Array.isArray(members)) {
+                fillMentionSelect(members, weeekMentionUserId);
+            }
+        } catch {}
+    }
+
+    dom.mentionSelect.addEventListener('change', async () => {
+        const val = dom.mentionSelect.value;
+        await saveToStorage({ weeekMentionUserId: val || null });
+    });
+
+    // Поиск по людям
+    let allMembers = [];
+    try {
+        const resp = await browser.runtime.sendMessage({ type: 'weeek.members' });
+        const members = resp && resp.ok ? resp.data : [];
+        if (Array.isArray(members)) allMembers = members;
+    } catch {}
+    dom.mentionSearch?.addEventListener('input', () => {
+        const q = (dom.mentionSearch.value || '').toLowerCase().trim();
+        const filtered = !q ? allMembers : allMembers.filter(m => {
+            const text = `${m.name || ''} ${m.firstName || ''} ${m.lastName || ''} ${m.email || ''}`.toLowerCase();
+            return text.includes(q);
+        });
+        fillMentionSelect(filtered, dom.mentionSelect.value);
+    });
 }
 
 
